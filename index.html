@@ -186,6 +186,7 @@ h2{font:700 18px/1.2 var(--round);margin:0}
     </section>
     <section class="night" id="night" hidden><div><b>Ya es hora de cerrar 🌙</b><p>Deja los proyectos para mañana. Tu cuerpo lo agradece.</p></div><button id="nightBtn">Ya cerré</button></section>
     <section class="block" id="gymToday"></section>
+    <section class="block" id="enToday" hidden></section>
     <section class="block" id="agToday" hidden><div class="block-h"><h2>Agenda de hoy</h2></div><ul class="ag" id="agList"></ul></section>
     <section><div class="block-h" style="padding:0 2px"><h2>Hábitos</h2><button class="link" id="editHabits">Editar</button></div><ul class="habits" id="habits"></ul></section>
     <div class="install" id="installTip" hidden><b>Instálala en tu iPhone:</b> en Safari toca Compartir y luego "Agregar a pantalla de inicio".</div>
@@ -216,6 +217,7 @@ h2{font:700 18px/1.2 var(--round);margin:0}
     <section class="block"><div class="block-h"><h2>Tu peso semana a semana</h2></div><div class="chart" id="chart"></div></section>
     <section class="block"><div class="block-h"><h2>Últimos 14 días</h2></div><div class="streaks" id="streaks"></div></section>
     <section class="block"><div class="block-h"><h2>Esta semana</h2></div><p class="sub num" id="weekGym" style="margin:0"></p></section>
+    <section class="block"><div class="block-h"><h2>Temas de inglés</h2></div><ul class="ag" id="enList"></ul></section>
   </main>
 
   <!-- AJUSTES -->
@@ -229,7 +231,7 @@ h2{font:700 18px/1.2 var(--round);margin:0}
     <section class="block" style="display:flex;flex-direction:column;gap:12px"><h2>Color de la app</h2><div class="themes" id="themes"></div></section>
     <section>
       <h2 style="margin-bottom:10px">Respaldo</h2>
-      <p class="help" style="margin-bottom:10px">Tus datos viven solo en este celular. Cada domingo guarda un respaldo y mándaselo a tu Entrenador en el chat.</p>
+      <p class="help" style="margin-bottom:10px">Tus datos viven solo en este celular. Cada domingo, y después de tu clase de inglés, guarda un respaldo y pásalo por AirDrop a tu carpeta respaldos-dia de la Mac. Así tu Entrenador y tu Tutor lo leen.</p>
       <div class="list">
         <button class="row" id="bkSave"><span>Guardar respaldo<small id="bkLast">Nunca has hecho uno</small></span><span class="go">›</span></button>
         <label class="row" style="cursor:pointer"><span>Cargar un respaldo<small>Reemplaza lo que hay en este celular</small></span><span class="go">›</span><input type="file" id="bkLoad" accept=".json,application/json" hidden></label>
@@ -293,7 +295,7 @@ function blank(){return{habits:[
   {id:"musica",n:"Sax o piano",em:"🎷",k:"timer",min:30},
   {id:"proy",n:"Avanzar proyectos",em:"💻",k:"timer",min:60},
   {id:"dormir",n:"Cerrar a tiempo",em:"🌙",k:"check"}
- ],log:{},agenda:[],gym:{},runs:{},body:[],settings:{close:"22:30",theme:"menta"},lastBackup:null};}
+ ],log:{},agenda:[],english:[],gym:{},runs:{},body:[],settings:{close:"22:30",theme:"menta"},lastBackup:null};}
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||blank();}catch(e){S=blank();}
 S={...blank(),...S,settings:{...blank().settings,...(S.settings||{})}};
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
@@ -338,6 +340,11 @@ function renderHoy(){
   const ag=S.agenda.filter(a=>a.d===d).sort((a,b)=>(a.t||"99").localeCompare(b.t||"99"));
   $("agToday").hidden=!ag.length;
   $("agList").innerHTML=ag.map(a=>'<li><span class="t">'+(a.t?fmtTime(a.t):"Hoy")+'</span><span>'+esc(a.n)+'</span><button class="x" data-del="'+a.id+'" aria-label="Quitar">✕</button></li>').join("");
+  // inglés: martes y sábado, o si hay "inglés" en la agenda de hoy
+  const enDay=[2,6].includes(new Date().getDay())||ag.some(a=>/ingl/i.test(a.n)),en=S.english.find(x=>x.d===d);
+  $("enToday").hidden=!(enDay||en);
+  if(en&&!enEdit)$("enToday").innerHTML='<div class="block-h"><h2>🇺🇸 Inglés de hoy</h2><button class="link" id="enEd">Editar</button></div><p class="sub" style="margin:0">'+esc(en.t)+'</p><p class="help" style="margin-top:8px">Guarda un respaldo para que tu Tutor arme tus retos con este tema.</p>';
+  else $("enToday").innerHTML='<div class="block-h"><h2>🇺🇸 ¿Qué viste hoy en inglés?</h2></div><label class="field"><span>El tema central de la clase</span><input class="input" id="enIn" maxlength="80" placeholder="Ej. Present perfect" autocomplete="off" value="'+(en?esc(en.t):"")+'"></label><button class="btn" id="enSave" style="margin-top:10px">Guardar tema</button>';
   // hábitos
   $("habits").innerHTML=S.habits.map(h=>{const done=!!g.done[h.id];
     if(h.k==="timer"){const s=runSecs(h,d),run=g.run&&g.run.id===h.id;
@@ -354,6 +361,12 @@ $("habits").addEventListener("click",e=>{
 $("agList").addEventListener("click",e=>{const b=e.target.closest("[data-del]");if(!b)return;const a=S.agenda.find(x=>x.id===b.dataset.del);S.agenda=S.agenda.filter(x=>x!==a);persist();renderHoy();toast("Quitado de la agenda");});
 $("nightBtn").onclick=()=>{const d=today(),g=L(d);stopRun(d);g.done.dormir=true;persist();renderHoy();const st=dayStats(d);celebrate(st.k===st.n?"¡Día completo! Descansa 🌙":"Bien hecho. A dormir 🌙");};
 $("editHabits").onclick=()=>go("aj");
+let enEdit=false;
+$("enToday").addEventListener("click",e=>{
+  if(e.target.closest("#enEd")){enEdit=true;renderHoy();const i=$("enIn");if(i)i.focus();return;}
+  if(e.target.closest("#enSave")){const t=$("enIn").value.trim();if(!t){toast("Escribe el tema de la clase");return;}
+    const d=today();S.english=S.english.filter(x=>x.d!==d);S.english.push({d,t});enEdit=false;persist();renderHoy();renderAv();toast("Tema guardado. Respáldalo para tu Tutor");}
+});
 
 /* ---------- Gym ---------- */
 let gymDay=new Date().getDay();
@@ -399,6 +412,8 @@ function renderAv(){
     return '<div class="sk"><span>'+h.em+'</span><span>'+esc(h.n)+'</span><b class="num">'+on+'/14</b><span class="dots">'+days.map(d=>'<i class="'+(S.log[d]&&S.log[d].done&&S.log[d].done[h.id]?"on":"")+'"></i>').join("")+'</span></div>';}).join("");
   const ws=new Date();ws.setDate(ws.getDate()-((ws.getDay()+6)%7));const w0=ymd(ws);
   const g=Object.keys(S.gym).filter(d=>d>=w0&&S.gym[d].done).length,km=Object.entries(S.runs).filter(([d])=>d>=w0).reduce((s,[,r])=>s+r.km,0);
+  const el=S.english.slice().sort((a,c)=>c.d.localeCompare(a.d)).slice(0,6);
+  $("enList").innerHTML=el.map(x=>'<li><span class="t">'+x.d.slice(5).split("-").reverse().join("/")+'</span><span>'+esc(x.t)+'</span></li>').join("")||'<li class="empty">Los martes y sábados anota el tema de tu clase en Hoy.</li>';
   $("weekGym").textContent="🏋️ "+g+" de 6 entrenamientos · 🏃 "+(Math.round(km*10)/10)+" km corridos";
 }
 $("saveBody").onclick=()=>{const kg=parseFloat($("inKg").value),w=parseFloat($("inWaist").value);if(!(kg>0)&&!(w>0)){toast("Escribe tu peso o tu cintura");return;}
