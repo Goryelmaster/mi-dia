@@ -340,8 +340,8 @@ function renderHoy(){
   const ag=S.agenda.filter(a=>a.d===d).sort((a,b)=>(a.t||"99").localeCompare(b.t||"99"));
   $("agToday").hidden=!ag.length;
   $("agList").innerHTML=ag.map(a=>'<li><span class="t">'+(a.t?fmtTime(a.t):"Hoy")+'</span><span>'+esc(a.n)+'</span><button class="x" data-del="'+a.id+'" aria-label="Quitar">✕</button></li>').join("");
-  // inglés: martes y sábado, o si hay "inglés" en la agenda de hoy
-  const enDay=[2,6].includes(new Date().getDay())||ag.some(a=>/ingl/i.test(a.n)),en=S.english.find(x=>x.d===d);
+  // inglés: solo si hoy tienes "inglés" en tu agenda
+  const enDay=ag.some(a=>/ingl[eé]s/i.test(a.n)),en=S.english.find(x=>x.d===d);
   $("enToday").hidden=!(enDay||en);
   if(en&&!enEdit)$("enToday").innerHTML='<div class="block-h"><h2>🇺🇸 Inglés de hoy</h2><button class="link" id="enEd">Editar</button></div><p class="sub" style="margin:0">'+esc(en.t)+'</p><p class="help" style="margin-top:8px">Guarda un respaldo para que tu Tutor arme tus retos con este tema.</p>';
   else $("enToday").innerHTML='<div class="block-h"><h2>🇺🇸 ¿Qué viste hoy en inglés?</h2></div><label class="field"><span>El tema central de la clase</span><input class="input" id="enIn" maxlength="80" placeholder="Ej. Present perfect" autocomplete="off" value="'+(en?esc(en.t):"")+'"></label><button class="btn" id="enSave" style="margin-top:10px">Guardar tema</button>';
@@ -413,7 +413,7 @@ function renderAv(){
   const ws=new Date();ws.setDate(ws.getDate()-((ws.getDay()+6)%7));const w0=ymd(ws);
   const g=Object.keys(S.gym).filter(d=>d>=w0&&S.gym[d].done).length,km=Object.entries(S.runs).filter(([d])=>d>=w0).reduce((s,[,r])=>s+r.km,0);
   const el=S.english.slice().sort((a,c)=>c.d.localeCompare(a.d)).slice(0,6);
-  $("enList").innerHTML=el.map(x=>'<li><span class="t">'+x.d.slice(5).split("-").reverse().join("/")+'</span><span>'+esc(x.t)+'</span></li>').join("")||'<li class="empty">Los martes y sábados anota el tema de tu clase en Hoy.</li>';
+  $("enList").innerHTML=el.map(x=>'<li><span class="t">'+x.d.slice(5).split("-").reverse().join("/")+'</span><span>'+esc(x.t)+'</span></li>').join("")||'<li class="empty">Agenda tu clase de inglés y ese día te pregunto el tema en Hoy.</li>';
   $("weekGym").textContent="🏋️ "+g+" de 6 entrenamientos · 🏃 "+(Math.round(km*10)/10)+" km corridos";
 }
 $("saveBody").onclick=()=>{const kg=parseFloat($("inKg").value),w=parseFloat($("inWaist").value);if(!(kg>0)&&!(w>0)){toast("Escribe tu peso o tu cintura");return;}
