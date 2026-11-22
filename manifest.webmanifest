@@ -1,7 +1,7 @@
 {
   "name": "Mi día",
   "short_name": "Mi día",
-  "description": "Hábitos, cronómetros, gym y sueño sin internet.",
+  "description": "Hábitos, cronómetros, tu semana y sueño sin internet.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
