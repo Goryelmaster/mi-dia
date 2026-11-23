@@ -396,8 +396,9 @@ textarea.input{min-height:96px;resize:vertical;font:15px/1.4 var(--sans)}
     <section id="staffSec"><h2 style="margin-bottom:6px">Mis empleados</h2><p class="help" style="margin-bottom:10px">Tus agentes de Claude y a qué hora trabajan. Toca uno para cambiar su horario.</p><div class="list" id="staffAj"></div></section>
     <section class="block" style="display:flex;flex-direction:column;gap:12px">
       <h2>Avisos 5 min antes</h2>
-      <p class="help">Crea un archivo de calendario con tus empleados y tus eventos que se repiten cada semana. Ya en el Calendario del iPhone te avisa 5 minutos antes, aunque no tengas internet.</p>
-      <button class="btn" id="icsBtn">Agregar a mi calendario</button>
+      <p class="help">Con la nube conectada, tus empleados y tus eventos que se repiten se ponen solos en el calendario <b>Mi día</b> de tu Google Calendar, con aviso 5 minutos antes. Si cambias un horario aquí, allá se actualiza solo.</p>
+      <p class="help" id="calTxt"></p>
+      <button class="btn ghost sm" id="icsBtn">Sin nube: bajar archivo .ics</button>
       <p class="help" id="icsTxt"></p>
     </section>
     <section class="block" id="nube" style="display:flex;flex-direction:column;gap:12px">
@@ -1176,7 +1177,8 @@ async function syncNow(manual){
   if(!rows.length&&stS===sync.stSig){paintSync();if(manual)toast("Ya estaba todo en la nube");return;}
   syncing=true;paintSync();
   try{
-    await api({accion:"guardar",tablas:{dias:rows,empleados:S.staff.map(x=>({id:x.id,empleado:x.n,que_hace:x.what,dias:daysTxt(x.days),hora:x.t,pide:x.p}))},reemplazar:["empleados"],estado:S,resumen:resumen(),vacio:isEmpty()});
+    const j=await api({accion:"guardar",tablas:{dias:rows,empleados:S.staff.map(x=>({id:x.id,empleado:x.n,que_hace:x.what,dias:daysTxt(x.days),hora:x.t,pide:x.p}))},reemplazar:["empleados"],estado:S,resumen:resumen(),vacio:isEmpty()});
+    if(typeof j.calendario==="string")sync.cal=j.calendario;
     rows.forEach(r=>{sync.sig[r.id]=hash(JSON.stringify(r));});sync.stSig=stS;sync.last=Date.now();sync.err="";if(manual)toast("Listo, subido a la nube");
   }catch(e){sync.err=String(e&&e.message||e);if(manual)toast("No se pudo subir: "+sync.err);}
   syncing=false;saveJ(SKEY,sync);paintSync();
@@ -1186,6 +1188,7 @@ function paintSync(){const on=navigator.onLine,el=$("net"),tx=el.lastElementChil
   tx.textContent=!on?(dirty?"Sin internet · ⏳ "+(n?n+(n>1?" días pendientes":" día pendiente"):"cambios pendientes"):"Sin internet, se guarda igual")
     :!cloudOn()?"En tu celular":syncing?"Subiendo…":dirty?(sync.err?"⏳ Pendiente (error)":"⏳ "+(n?n+(n>1?" días pendientes":" día pendiente"):"Pendiente")):"✓ En la nube";
   $("cloudLast").textContent=!cloudOn()?"Aún no se conecta":sync.err?"Error: "+sync.err:sync.last?"Última subida: "+new Date(sync.last).toLocaleString("es-MX",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"}):"Aún no se sube nada";
+  $("calTxt").textContent=!cloudOn()?"Conecta la nube (abajo) para activarlo.":sync.cal==="ok"?"✓ Google Calendar al día":sync.cal?"⚠️ Google Calendar: "+sync.cal.replace(/^Error: /,"")+" — en el script corre «sincronizarCalendario» una vez.":"⏳ Se activa cuando actualices el script (ver guía).";
   $("cloudTxt").textContent=cloudOn()?"Conectada. Todo se guarda primero en tu celular y se sube solo cuando hay internet, a la carpeta Datos apps de tu Drive.":"Usa la misma URL y clave de Mi dinero. Tus datos se guardan en tu Google Drive para que tus agentes los lean.";}
 function renderNube(){if(document.activeElement!==$("cloudUrl"))$("cloudUrl").value=cloud.url;if(document.activeElement!==$("cloudKey"))$("cloudKey").value=cloud.key;paintSync();}
 $("cloudUrl").addEventListener("change",e=>{cloud.url=e.target.value.trim();saveJ(CKEY,cloud);paintSync();if(cloudOn())syncNow(true);});
