@@ -1,9 +1,9 @@
 // Guarda la app en el celular para que abra sin internet.
-const CACHE = "mi-dia-v7";
+const CACHE = "mi-dia-v8";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {
@@ -13,17 +13,38 @@ self.addEventListener("activate", e => {
   );
 });
 
-// Primero lo guardado; si hay internet, actualiza en segundo plano.
+// Páginas: primero internet (máx. 4 s), si falla usa lo guardado.
+async function networkFirst(req, cache) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    let res;
+    try { res = await fetch(req, { cache: "no-store", signal: ctrl.signal }); }
+    finally { clearTimeout(t); }
+    if (res && res.ok) cache.put(req, res.clone());
+    if (res && res.ok) return res;
+    throw new Error("bad");
+  } catch (err) {
+    const hit = (await cache.match(req, { ignoreSearch: true })) || (await cache.match("./index.html"));
+    if (hit) return hit;
+    return Response.error();
+  }
+}
+
+// Resto: primero lo guardado; si hay internet, actualiza en segundo plano.
+async function staleWhileRevalidate(req, cache) {
+  const hit = await cache.match(req, { ignoreSearch: true });
+  const net = fetch(req, { cache: "no-cache" }).then(res => {
+    if (res && (res.ok || res.type === "opaque")) cache.put(req, res.clone());
+    return res;
+  }).catch(() => hit);
+  return hit || net;
+}
+
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
-  e.respondWith(
-    caches.open(CACHE).then(async cache => {
-      const hit = await cache.match(e.request, { ignoreSearch: true });
-      const net = fetch(e.request).then(res => {
-        if (res && (res.ok || res.type === "opaque")) cache.put(e.request, res.clone());
-        return res;
-      }).catch(() => hit);
-      return hit || net;
-    })
-  );
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const path = new URL(req.url).pathname;
+  const isPage = req.mode === "navigate" || path.endsWith("/") || path.endsWith("index.html");
+  e.respondWith(caches.open(CACHE).then(cache => isPage ? networkFirst(req, cache) : staleWhileRevalidate(req, cache)));
 });

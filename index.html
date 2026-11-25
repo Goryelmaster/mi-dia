@@ -1136,7 +1136,7 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden){tick();re
 setInterval(()=>{if(curView==="hoy")renderHoy();else if(curView==="sem"&&!openSheetId)renderSem();},60000);
 const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
 if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))$("installTip").hidden=false;
-try{if("serviceWorker" in navigator&&window.isSecureContext)navigator.serviceWorker.register("sw.js").catch(()=>{});}catch(e){}
+try{if("serviceWorker" in navigator&&window.isSecureContext){const had=!!navigator.serviceWorker.controller;let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!had||reloaded)return;reloaded=true;location.reload();});navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>{document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){try{reg.update().catch(()=>{});}catch(e){}}});}).catch(()=>{});}}catch(e){}
 
 /* ---------- Nube: cola de sincronización (igual que Mi dinero) ---------- */
 /* La URL y la clave son las mismas de Mi dinero y viven aparte (no van en respaldos ni en la nube). */
