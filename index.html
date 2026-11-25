@@ -423,6 +423,7 @@ textarea.input{min-height:96px;resize:vertical;font:15px/1.4 var(--sans)}
         <button class="row danger" id="wipe"><span>Borrar todo<small>No se puede deshacer</small></span></button>
       </div>
     </section>
+  <p class="help" id="appVer" style="text-align:center;margin-top:18px;opacity:.6"></p>
   </main>
 </div>
 
@@ -1136,6 +1137,8 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden){tick();re
 setInterval(()=>{if(curView==="hoy")renderHoy();else if(curView==="sem"&&!openSheetId)renderSem();},60000);
 const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
 if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))$("installTip").hidden=false;
+const APP_VER=9;
+try{$("appVer").textContent="Versión "+APP_VER+" · "+location.host+location.pathname;}catch(e){}
 try{if("serviceWorker" in navigator&&window.isSecureContext){const had=!!navigator.serviceWorker.controller;let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!had||reloaded)return;reloaded=true;location.reload();});navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>{document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){try{reg.update().catch(()=>{});}catch(e){}}});}).catch(()=>{});}}catch(e){}
 
 /* ---------- Nube: cola de sincronización (igual que Mi dinero) ---------- */
