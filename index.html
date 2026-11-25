@@ -1157,24 +1157,30 @@ const logDays=()=>Object.keys(S.log).filter(d=>hasData(S.log[d])).sort();
 function pendRows(){return logDays().map(dayRow).filter(r=>sync.sig[r.id]!==hash(JSON.stringify(r)));}
 const isEmpty=()=>!logDays().length&&!S.events.length;
 function isDirty(){return pendRows().length>0||hash(JSON.stringify(S))!==sync.stSig;}
+const uploadedToday=()=>!!(sync.last&&ymd(new Date(sync.last))===today());
+function needsUpload(){return isDirty()||!uploadedToday();}
+const hhmm=m=>pad(Math.floor(m/60)%24)+":"+pad(m%60);
+const agenda=d=>occ(d).slice().sort((a,b)=>a.s-b.s).map(o=>({inicio:hhmm(o.s),fin:hhmm(o.e),titulo:o.n,tipo:o.rep?"fijo":"evento",color:o.c,estado:o.st||""}));
 /* Resumen listo para tus agentes (Entrenador, Tutor, Jefe de proyectos) */
 function resumen(){const t=today(),ws=wkStart(t),g=S.log[t]||{};const en=S.english.slice().sort((a,b)=>b.d.localeCompare(a.d))[0];
-  return{fecha:t,hoy:dayRow(t),eventosHoy:occ(t).map(o=>({n:o.n,hora:fmtR(o.s,o.e),estado:o.st||""})),
+  const DK=["lun","mar","mie","jue","vie","sab","dom"],semana={};DK.forEach((k,i)=>{semana[k]=agenda(addD(ws,i));});
+  const lh=habsOn(t).map(h=>({id:h.id,nombre:h.n,tipo:h.k,hecho:!!(g.done&&g.done[h.id])}));
+  return{fecha:t,registroHoy:dayRow(t),hoy:agenda(t),manana:agenda(addD(t,1)),semana,semanaInicio:ws,habitos:{fecha:t,lista:lh,hechos:lh.filter(x=>x.hecho).length,total:lh.length},eventosHoy:occ(t).map(o=>({n:o.n,hora:fmtR(o.s,o.e),estado:o.st||""})),
     empleadosHoy:staffToday(t).map(x=>({empleado:x.n,hora:fmtT(x.t),que:x.what})),
     empleados:staffPlan(),ultimoTemaIngles:en||null,entrenoHoy:!!(g.done&&g.done.entrene),
-    semana:weekData(ws),libresProximaSemana:freeSlots(addD(ws,7)).map(({fecha,dia,hora,min})=>({fecha,dia,hora,min})),
+    semanaStats:weekData(ws),libresProximaSemana:freeSlots(addD(ws,7)).map(({fecha,dia,hora,min})=>({fecha,dia,hora,min})),
     ultimaRevision:(S.reviews[Object.keys(S.reviews).sort().pop()]||{}).texto||null};}
 async function api(body){
   const r=await fetch(cloud.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({...body,app:"mi-dia",clave:cloud.key}),redirect:"follow"});
   let j;try{j=await r.json();}catch(e){throw new Error("El script no respondió bien. Revisa la URL.");}
   if(!j.ok)throw new Error(j.error||"Error del script");return j;}
-function scheduleSync(ms){clearTimeout(syncT);syncT=setTimeout(()=>syncNow(false),ms==null?1500:ms);}
+function scheduleSync(ms){clearTimeout(syncT);syncT=setTimeout(()=>syncNow(false),ms==null?3000:ms);}
 async function syncNow(manual){
   if(!cloudOn()){paintSync();if(manual)toast("Primero pon la URL y la clave");return;}
   if(!navigator.onLine){paintSync();if(manual)toast("Sin internet. Se sube solo cuando vuelva");return;}
   if(syncing)return;
   const rows=pendRows(),stS=hash(JSON.stringify(S));
-  if(!rows.length&&stS===sync.stSig){paintSync();if(manual)toast("Ya estaba todo en la nube");return;}
+  if(!manual&&!rows.length&&stS===sync.stSig&&uploadedToday()){paintSync();return;}
   syncing=true;paintSync();
   try{
     const j=await api({accion:"guardar",tablas:{dias:rows,empleados:S.staff.map(x=>({id:x.id,empleado:x.n,que_hace:x.what,dias:daysTxt(x.days),hora:x.t,pide:x.p}))},reemplazar:["empleados"],estado:S,resumen:resumen(),vacio:isEmpty()});
@@ -1187,7 +1193,7 @@ function paintSync(){const on=navigator.onLine,el=$("net"),tx=el.lastElementChil
   el.classList.toggle("no",!on);el.classList.toggle("pend",on&&dirty);
   tx.textContent=!on?(dirty?"Sin internet · ⏳ "+(n?n+(n>1?" días pendientes":" día pendiente"):"cambios pendientes"):"Sin internet, se guarda igual")
     :!cloudOn()?"En tu celular":syncing?"Subiendo…":dirty?(sync.err?"⏳ Pendiente (error)":"⏳ "+(n?n+(n>1?" días pendientes":" día pendiente"):"Pendiente")):"✓ En la nube";
-  $("cloudLast").textContent=!cloudOn()?"Aún no se conecta":sync.err?"Error: "+sync.err:sync.last?"Última subida: "+new Date(sync.last).toLocaleString("es-MX",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"}):"Aún no se sube nada";
+  $("cloudLast").textContent=!cloudOn()?"Aún no se conecta":sync.err?"Error: "+sync.err:sync.last?"Última subida a Drive: "+new Date(sync.last).toLocaleString("es-MX",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"}):"Aún no se sube nada";
   $("calTxt").textContent=!cloudOn()?"Conecta la nube (abajo) para activarlo.":sync.cal==="ok"?"✓ Google Calendar al día":sync.cal?"⚠️ Google Calendar: "+sync.cal.replace(/^Error: /,"")+" — en el script corre «sincronizarCalendario» una vez.":"⏳ Se activa cuando actualices el script (ver guía).";
   $("cloudTxt").textContent=cloudOn()?"Conectada. Todo se guarda primero en tu celular y se sube solo cuando hay internet, a la carpeta Datos apps de tu Drive.":"Usa la misma URL y clave de Mi dinero. Tus datos se guardan en tu Google Drive para que tus agentes los lean.";}
 function renderNube(){if(document.activeElement!==$("cloudUrl"))$("cloudUrl").value=cloud.url;if(document.activeElement!==$("cloudKey"))$("cloudKey").value=cloud.key;paintSync();}
@@ -1204,7 +1210,7 @@ $("net").addEventListener("click",()=>{go("aj");setTimeout(()=>$("nube").scrollI
 addEventListener("online",()=>{paintSync();scheduleSync(300);});
 addEventListener("offline",paintSync);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&cloudOn())scheduleSync(300);});
-setInterval(()=>{if(cloudOn()&&navigator.onLine&&!syncing&&isDirty())syncNow(false);},60000);
+setInterval(()=>{if(cloudOn()&&navigator.onLine&&!syncing&&needsUpload())syncNow(false);},60000);
 cloudReady=true;
 
 function renderAll(){applyTheme(S.settings.theme);renderHoy();if(curView==="sem")renderSem();renderAv();renderAj();}
