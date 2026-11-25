@@ -203,6 +203,11 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--ink-3)
 .chip{padding:9px 13px;border-radius:12px;background:var(--paper);font:600 14px var(--round);border:2px solid transparent;transition:transform 140ms var(--ease-out)}
 .chip:active{transform:scale(.95)}
 .chip.best{border-color:var(--leaf)}
+.chip.on{border-color:var(--leaf);background:var(--white)}
+.chip small{display:block;font:600 10.5px var(--sans);color:var(--leaf)}
+.mini-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.prom{border:2px solid var(--mango)}
+.okcard{border:2px solid var(--leaf)}
 .warn{font-size:13px;color:var(--coral);margin:0}
 .dur{font:600 13px var(--round);color:var(--ink-2)}
 
@@ -352,10 +357,15 @@ textarea.input{min-height:96px;resize:vertical;font:15px/1.4 var(--sans)}
     </section>
     <section class="night" id="night" hidden><div><b>Ya es hora de cerrar 🌙</b><p>Deja los proyectos para mañana. Tu cuerpo lo agradece.</p></div><button id="nightBtn">Ya cerré</button></section>
     <button class="plan press" id="planCard" hidden></button>
+    <section class="block" id="dtCard" hidden></section>
+    <section class="block" id="runCard" hidden></section>
+    <section class="block" id="gymTop" hidden></section>
+    <section class="block" id="workCard" hidden></section>
     <section class="block legacy" id="legacyCard" hidden><div class="block-h"><h2>Tus datos viejos del gym</h2></div><p>El gym, la carrera, el peso y la cintura ahora viven en Mi entrenador. Guardé tus registros aparte: bájalos y pásalos por AirDrop a tu Mac (carpeta respaldos-entrenador).</p><button class="btn sm" id="legacyBtn">Guardar datos del entrenador</button></section>
     <section class="block" id="dayBlock"><div class="block-h"><h2>Tu día</h2><button class="link" id="goWeek">Ver semana</button></div><ul class="ag tday" id="dayList"></ul></section>
     <section class="block" id="staffToday" hidden><div class="block-h"><h2>Mis empleados hoy</h2><button class="link" id="staffEdit">Horarios</button></div><ul class="ag staff" id="staffList"></ul></section>
     <section class="block" id="enToday" hidden></section>
+    <section class="block" id="gymLow" hidden></section>
     <section><div class="block-h" style="padding:0 2px"><h2>Hábitos</h2><button class="link" id="editHabits">Editar</button></div><ul class="habits" id="habits"></ul></section>
     <section class="block ck" id="ckBlock"></section>
     <div class="install" id="installTip" hidden><b>Instálala en tu iPhone:</b> en Safari toca Compartir y luego "Agregar a pantalla de inicio".</div>
@@ -371,6 +381,7 @@ textarea.input{min-height:96px;resize:vertical;font:15px/1.4 var(--sans)}
     <div class="frees" id="frees"></div>
     <div class="strip" id="strip"></div>
     <div class="dayname" id="dayName"></div>
+    <section class="block" id="dtSem"></section>
     <div id="tlWrap"></div>
     <div class="wk-actions"><button class="btn ghost sm" id="logPast">Anotar algo que ya pasó</button><button class="btn sm" id="addEv">Agregar evento</button></div>
   </main>
@@ -392,6 +403,14 @@ textarea.input{min-height:96px;resize:vertical;font:15px/1.4 var(--sans)}
     <section class="block" style="display:flex;flex-direction:column;gap:12px">
       <h2>Hora de cerrar</h2>
       <label class="field"><span>A esta hora ya no más proyectos ni pantallas</span><input class="input num" id="closeAt" type="time"></label>
+    </section>
+    <section class="block" id="miSemana" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Mi semana</h2>
+      <div class="field"><span>Día de descanso</span><div class="wdays" id="restDays"></div></div>
+      <label class="field"><span>Horas normales por turno</span><input class="input num" id="shiftH" type="number" min="1" max="16" step="0.5" inputmode="decimal"></label>
+      <label class="field"><span>Ajuste del banco de horas (minutos, puede ser negativo)</span><input class="input num" id="bankAdj" type="number" step="5" inputmode="numeric"></label>
+      <p class="help num" id="bankTxt"></p>
+      <div class="row2"><label class="field"><span>Dormir a las</span><input class="input num" id="sleepBed" type="time"></label><label class="field"><span>Levantarme a las</span><input class="input num" id="sleepWake" type="time"></label></div>
     </section>
     <section id="staffSec"><h2 style="margin-bottom:6px">Mis empleados</h2><p class="help" style="margin-bottom:10px">Tus agentes de Claude y a qué hora trabajan. Toca uno para cambiar su horario.</p><div class="list" id="staffAj"></div></section>
     <section class="block" style="display:flex;flex-direction:column;gap:12px">
@@ -546,7 +565,8 @@ const mmss=s=>{s=Math.max(0,Math.floor(s));const h=Math.floor(s/3600),m=Math.flo
 // lo que falta se redondea hacia arriba: arranca en 30:00, no en 29:59
 const left=s=>mmss(Math.ceil(s-0.05));
 const ENTRENADOR="https://goryelmaster.github.io/mi-entrenador/";
-const DAY0=360,DAY1=1380,PX=1.2; // 6:00 am a 11:00 pm, 1.2 px por minuto
+const DAY0=360,DAY1=1440,PX=1.2; // 6:00 am a 12:00 am (medianoche), 1.2 px por minuto
+const ROT=["Torso","Pierna con saltos","Torso","Pierna con agilidad"]; // rotación del gym: sigue por orden, sin importar los días
 const COLORS={mango:"#F2A541",hoja:"#2E8B57",cielo:"#2F7FBF",coral:"#D2553F",uva:"#7A4FA3",pizarra:"#5E7A72"};
 const DL=["D","L","M","M","J","V","S"],DN=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 const rgba=(hex,a)=>{const n=parseInt(hex.slice(1),16);return"rgba("+(n>>16)+","+(n>>8&255)+","+(n&255)+","+a+")";};
@@ -561,8 +581,13 @@ function blank(){return{habits:[
   {id:"proy",n:"Avanzar proyectos",em:"💻",k:"timer",min:60},
   {id:"entrene",n:"Entrené hoy",em:"💪",k:"check"},
   GRAT(),
+  ...HYG(),
   {id:"dormir",n:"Cerrar a tiempo",em:"🌙",k:"check"}
- ],log:{},events:[],st:{},planned:{},english:[],staff:STAFF0(),reviews:{},settings:{close:"22:30",theme:"menta"},lastBackup:null,trainerArchive:null};}
+ ],log:{},events:[],st:{},planned:{},english:[],staff:STAFF0(),reviews:{},settings:{close:"23:15",theme:"menta",restDay:null,shiftH:8,bankAdj:0,sleepBed:"23:15",sleepWake:"06:15"},lastBackup:null,trainerArchive:null,
+ dayType:{},tplEx:{},gym2:{idx:0,sessions:[],runs:[]},schemaV:2};}
+// Hábitos de higiene fijos (no se pueden borrar, sí renombrar)
+function HYG(since){const x=(id,n,em)=>{const h={id,n,em,k:"check",fixed:true};if(since)h.since=since;return h;};
+  return[x("banio","Bañarme","🚿"),x("dientesam","Dientes en la mañana","🪥"),x("dientespm","Dientes en la noche","🪥"),x("ropa","Dejar lista la ropa de mañana","👕")];}
 // Hábito fijo: se marca solo cuando escribes al menos una cosa
 function GRAT(){return{id:"gracias",n:"Agradecimiento",em:"🙏",k:"grat"};}
 // Tus agentes de Claude (días: 0 = domingo … 6 = sábado)
@@ -576,8 +601,14 @@ function STAFF0(){return[
 
 // Convierte datos de la versión anterior: el entrenador se guarda aparte y la agenda pasa al calendario.
 function migrate(d){
+  const v0=(d&&d.schemaV)||1; // versión de datos que traía; los pasos de una sola vez corren solo si es < 2
   const b=blank();d={...b,...d,settings:{...b.settings,...(d.settings||{})}};
   const has=x=>x&&(Array.isArray(x)?x.length:Object.keys(x).length);
+  if(Array.isArray(d.eventsOff)){ // eventos repetitivos desactivados que la nube guardó aparte
+    d.events=Array.isArray(d.events)?d.events.slice():[];
+    d.eventsOff.forEach(e=>{if(e&&!d.events.some(x=>x&&x.id===e.id))d.events.push(e);});
+    delete d.eventsOff;
+  }
   if(has(d.gym)||has(d.runs)||has(d.body)){
     const old=d.trainerArchive||{gym:{},runs:{},body:[]};
     d.trainerArchive={archivedAt:old.archivedAt||Date.now(),exported:old.exported||null,gym:{...old.gym,...(d.gym||{})},runs:{...old.runs,...(d.runs||{})},body:(old.body||[]).concat(d.body||[])};
@@ -592,6 +623,18 @@ function migrate(d){
   if(!d.habits.some(h=>h.id==="gracias")){const i=d.habits.findIndex(h=>h.id==="dormir");d.habits.splice(i<0?d.habits.length:i,0,{...GRAT(),since:today()});}
   if(!Array.isArray(d.staff)||!d.staff.length)d.staff=STAFF0();
   d.reviews=d.reviews||{};
+  // higiene fija: se agrega solo si falta (since: hoy, para no romper rachas pasadas)
+  HYG(today()).forEach(h=>{if(!d.habits.some(x=>x.id===h.id)){const i=d.habits.findIndex(x=>x.id==="dormir");d.habits.splice(i<0?d.habits.length:i,0,h);}});
+  // campos nuevos (solo se agregan, nunca se borra nada)
+  d.dayType=d.dayType||{};d.tplEx=d.tplEx||{};
+  const g2=d.gym2||{};d.gym2={...g2,idx:Math.max(0,+g2.idx||0),sessions:Array.isArray(g2.sessions)?g2.sessions:[],runs:Array.isArray(g2.runs)?g2.runs:[]};
+  if(v0<2){ // una sola vez
+    if(d.settings.close==="22:30")d.settings.close="23:15";
+    // rutinas fijas por día de la semana (gym, inglés): se apagan, no se borran; el historial se queda
+    const y=addD(today(),-1);
+    d.events.forEach(ev=>{if(ev.rep&&ev.rep.length&&!ev.off&&/gym|torso|pierna|entren|ingl[eé]s/i.test(ev.n||"")){ev.until=y;ev.off=true;}});
+  }
+  d.schemaV=2;
   return d;
 }
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||blank();}catch(e){S=blank();}
@@ -605,8 +648,8 @@ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}c
 const L=d=>(S.log[d]=S.log[d]||{done:{},sec:{}});
 
 /* ---------- Tiempo ---------- */
-function fmtM(m,ap){const h=Math.floor(m/60),mi=m%60,s=h>=12?"pm":"am";return((h%12)||12)+":"+pad(mi)+(ap===false?"":" "+s);}
-function fmtR(s,e){const a=s>=720?"pm":"am",b=e>=720?"pm":"am";return a===b?fmtM(s,false)+" – "+fmtM(e):fmtM(s)+" – "+fmtM(e);}
+function fmtM(m,ap){const h=Math.floor(m/60),mi=m%60,s=h>=12&&h<24?"pm":"am";return((h%12)||12)+":"+pad(mi)+(ap===false?"":" "+s);}
+function fmtR(s,e){const a=s>=720&&s<1440?"pm":"am",b=e>=720&&e<1440?"pm":"am";return a===b?fmtM(s,false)+" – "+fmtM(e):fmtM(s)+" – "+fmtM(e);}
 function fmtDur(m){m=Math.round(m);const h=Math.floor(m/60),r=m%60;return h?(h+" h"+(r?" "+r+" min":"")):r+" min";}
 function fmtT(t){const[h,m]=t.split(":").map(Number);return fmtM(h*60+m);}
 function dLabel(s){const t=today();if(s===t)return"Hoy";if(s===addD(t,1))return"Mañana";if(s===addD(t,-1))return"Ayer";const d=pd(s);return DN[d.getDay()][0].toUpperCase()+DN[d.getDay()].slice(1)+" "+d.getDate()+" "+d.toLocaleDateString("es-MX",{month:"short"}).replace(".","");}
@@ -615,7 +658,7 @@ function dLabel(s){const t=today();if(s===t)return"Hoy";if(s===addD(t,1))return"
 function mk(ev,date){const k=date+"|"+ev.id;return{ev,date,s:ev.s,e:ev.e,n:ev.n,c:ev.c,k,rep:!!ev.rep,st:S.st[k]||""};}
 function occ(date){const w=dow(date),out=[];
   for(const ev of S.events){
-    if(ev.rep){if(ev.rep.includes(w)&&date>=ev.from&&!(ev.ex&&ev.ex[date]))out.push(mk(ev,date));}
+    if(ev.rep){if(ev.rep.includes(w)&&date>=ev.from&&!(ev.until&&date>ev.until)&&!(ev.ex&&ev.ex[date]))out.push(mk(ev,date));}
     else if(ev.d===date)out.push(mk(ev,date));}
   return out.sort((a,b)=>a.s-b.s||a.e-b.e);}
 function findOcc(k){const i=k.indexOf("|"),date=k.slice(0,i),id=k.slice(i+1);const ev=S.events.find(x=>x.id===id);return ev?mk(ev,date):null;}
@@ -638,6 +681,90 @@ function moveOcc(o,date,s,e){
   if(o.rep){o.ev.ex=o.ev.ex||{};o.ev.ex[o.date]=1;S.events.push({id:uid(),n:o.n,c:o.c,s,e,d:date,src:o.ev.id});}
   else{o.ev.d=date;o.ev.s=s;o.ev.e=e;}
   delete S.st[o.k];persist();renderAll();toast("Movido a "+dLabel(date).toLowerCase()+", "+fmtR(s,e));}
+
+/* ---------- Tipo de día (plantillas), banco de horas y entrenador flexible ---------- */
+const isWork=o=>!!(o.ev.work||/^trabajo/i.test(o.n));
+const restDay=()=>{const r=S.settings.restDay;return r==null||r===""?null:+r;};
+// Bloques: [inicio, fin, nombre, color, banderas]. Todo parte de la hora en minutos desde medianoche.
+const T_PRE=[[375,420,"Levantarme, bañarme y desayunar","mango"]];
+const T_POST=[[720,780,"Comer y camión","pizarra"],[780,1260,"Trabajo","hoja",{work:true}],[1260,1320,"Camión · tareas cortas en el celular","pizarra"],[1320,1350,"Cenar y dejar lista la ropa","mango"],[1350,1365,"Revisar Mi día y Mi dinero","cielo"],[1395,1410,"Dormir","uva"]];
+const TPL={
+  escuela:{n:"Escuela + trabajo",em:"🏫",short:"Escuela",b:[...T_PRE,[420,720,"Escuela","cielo"],...T_POST]},
+  sinesc:{n:"Sin escuela + trabajo",em:"🏋️",short:"Sin escuela",b:[...T_PRE,[480,600,"Gym","coral",{gym:true}],[600,720,"Libre o proyecto","uva"],...T_POST]},
+  sabado:{n:"Sábado inglés + trabajo",em:"🇺🇸",short:"Sábado inglés",b:[...T_PRE,[420,720,"Inglés","cielo"],...T_POST]},
+  descanso:{n:"Descanso",em:"🌿",short:"Descanso",b:[[480,540,"Correr","hoja",{run:true}],[1080,1125,"Revisión de la semana","uva"],[1395,1410,"Dormir","uva"]]}};
+const TPL_DUP=/escuela|clase|trabajo|chamba|gym|torso|pierna|ingl[eé]s/i;
+// Quita los bloques de plantilla de ese día y regresa los eventos que se repiten que habíamos apagado
+function clearTpl(date){
+  S.events=S.events.filter(ev=>{if(ev.tpl&&ev.d===date){delete S.st[date+"|"+ev.id];return false;}return true;});
+  (S.tplEx[date]||[]).forEach(id=>{const ev=S.events.find(x=>x.id===id);if(ev&&ev.ex)delete ev.ex[date];});
+  delete S.tplEx[date];delete S.dayType[date];}
+function setDayType(date,type){
+  clearTpl(date);
+  if(TPL[type]){S.dayType[date]=type;
+    // para no duplicar: apaga solo ese día los eventos repetidos parecidos (y anota cuáles, para poder regresarlos)
+    const ex=[];occ(date).forEach(o=>{if(o.rep&&TPL_DUP.test(o.n)){o.ev.ex=o.ev.ex||{};o.ev.ex[date]=1;ex.push(o.ev.id);}});
+    if(ex.length)S.tplEx[date]=ex;
+    TPL[type].b.forEach(([s,e,n,c,fl])=>S.events.push({id:uid(),n,c,s,e,d:date,tpl:type,...(fl||{})}));}
+  persist();renderAll();}
+// Sugerido: el día de descanso, luego sábado, si no escuela
+function suggestType(date){const w=dow(date);return restDay()!=null&&w===restDay()?"descanso":w===6?"sabado":"escuela";}
+function dtBlock(date,title){const cur=S.dayType[date],sug=suggestType(date);
+  return '<div class="block-h"><h2>'+title+'</h2>'+(cur?'<button class="link" data-dt="" data-dd="'+date+'">Quitar</button>':'')+'</div>'+
+    (cur?'<p class="help" style="margin-bottom:10px">'+esc(dLabel(date))+': '+esc(TPL[cur].n)+' · listo</p>':'')+
+    '<div class="chips">'+Object.keys(TPL).map(k=>'<button class="chip'+(cur===k?" on":"")+'" data-dt="'+k+'" data-dd="'+date+'" aria-pressed="'+(cur===k)+'">'+TPL[k].em+" "+TPL[k].short+(sug===k&&cur!==k?'<small>Sugerido</small>':'')+'</button>').join("")+'</div>'+
+    (cur==="descanso"?'<p class="help" style="margin-top:8px">Sin horario rígido: tiempo libre</p>':'');}
+function dtClick(e){const b=e.target.closest("[data-dt]");if(!b)return;const date=b.dataset.dd,k=b.dataset.dt;
+  if(k&&S.dayType[date]===k){toast("Ya está así");return;}
+  setDayType(date,k);toast(k?dLabel(date)+": "+TPL[k].n+" · listo":"Quité el tipo de día");}
+$("dtCard").addEventListener("click",dtClick);$("dtSem").addEventListener("click",dtClick);
+// Hoy: mañana desde las 6 pm; antes, solo hoy y solo si aún no tiene tipo
+function renderDt(){const d=today(),nm=nowMin(),tom=nm>=18*60,tg=tom?addD(d,1):S.dayType[d]?null:d;
+  $("dtCard").hidden=!tg;if(tg)$("dtCard").innerHTML=dtBlock(tg,tom?"¿Cómo será mañana?":"¿Cómo será hoy?");}
+
+// Banco de horas: (salida − entrada − horas normales) de cada bloque de trabajo hasta hoy, + ajuste manual.
+// Los eventos de una vez se cuentan todos; los que se repiten se cuentan con occ() en los últimos 120 días.
+function bankMin(){const t=today(),sh=(+S.settings.shiftH||8)*60;let sum=0;
+  S.events.forEach(ev=>{if(!ev.rep&&ev.d&&ev.d<=t&&(ev.work||/^trabajo/i.test(ev.n||"")))sum+=ev.e-ev.s-sh;});
+  if(S.events.some(ev=>ev.rep&&(ev.work||/^trabajo/i.test(ev.n||""))))for(let i=0;i<120;i++)occ(addD(t,-i)).forEach(o=>{if(o.rep&&isWork(o))sum+=o.e-o.s-sh;});
+  return sum+(Math.round(+S.settings.bankAdj)||0);}
+const fmtBank=m=>m===0?"0":(m>0?"+":"−")+fmtDur(Math.abs(m));
+function renderWork(force){const box=$("workCard"),d=today(),o=occ(d).find(isWork);box.hidden=!o;if(!o)return;
+  if(!force&&box.contains(document.activeElement))return;
+  const hm=m=>hhmm(Math.min(m,1440));
+  box.innerHTML='<div class="block-h"><h2>💼 Trabajo</h2><span class="dur num">Banco de horas: '+fmtBank(bankMin())+'</span></div><div class="row2"><label class="field"><span>Entrada</span><input class="input num" type="time" step="300" id="wkIn" value="'+hm(o.s)+'"></label><label class="field"><span>Salida</span><input class="input num" type="time" step="300" id="wkOut" value="'+hm(o.e)+'"></label></div>';}
+$("workCard").addEventListener("change",e=>{if(e.target.id!=="wkIn"&&e.target.id!=="wkOut")return;const d=today(),o=occ(d).find(isWork);if(!o)return;
+  let s=t2m($("wkIn").value),en=t2m($("wkOut").value);if(s==null||en==null){renderWork(true);return;}
+  s=Math.round(s/5)*5;en=Math.round(en/5)*5;if(en===0&&s>0)en=DAY1;
+  s=Math.max(DAY0,Math.min(s,DAY1-5));en=Math.min(DAY1,en);
+  if(en<=s){toast("La salida debe ser después de la entrada");renderWork(true);return;}
+  if(o.rep){o.ev.ex=o.ev.ex||{};o.ev.ex[d]=1;const ne={id:uid(),n:o.n,c:o.c,s,e:en,d,src:o.ev.id,work:true};S.events.push(ne);if(S.st[o.k])S.st[d+"|"+ne.id]=S.st[o.k];delete S.st[o.k];}
+  else{o.ev.s=s;o.ev.e=en;}
+  persist();renderAll();renderWork(true);toast("Trabajo: "+fmtR(s,en));});
+
+// Entrenador: la rotación sigue donde te quedaste, sin importar el día
+const gymWeek=()=>{const ws=wkStart(today()),we=addD(ws,6);return S.gym2.sessions.filter(x=>x.d>=ws&&x.d<=we).length;};
+// descansas si hoy tiene tipo "descanso", o (sin tipo elegido) si hoy es tu día de descanso
+const restToday=()=>{const d=today(),t=S.dayType[d];return t?t==="descanso":restDay()!=null&&dow(d)===restDay();};
+function renderGym(){const d=today(),g2=S.gym2,rest=restToday(),dt=S.dayType[d];
+  const isGym=!rest&&(dt==="sinesc"||occ(d).some(o=>o.ev.gym||/gym|torso|pierna/i.test(o.n)));
+  const sess=g2.sessions.filter(x=>x.d===d).pop(),nx=ROT[g2.idx%4],x=gymWeek();
+  const cnt=x>=3?x+"/2 · +"+(x-2)+" extra 💪":x+"/2 esta semana";
+  const box=$(isGym?"gymTop":"gymLow");$("gymTop").hidden=!isGym;$("gymLow").hidden=isGym;
+  box.className="block"+(isGym?" prom":"")+(x>=2?" okcard":"");
+  box.innerHTML='<div class="block-h"><h2>🏋️ Entrenador</h2><span class="dur num">'+cnt+'</span></div>'+
+    (sess?'<div class="mini-row"><b>Hoy: '+esc(sess.t)+' ✓</b><button class="btn ghost sm" style="width:auto;padding:0 16px" data-gy="undo">Deshacer</button></div>'
+    :'<div class="mini-row"><span>Siguiente sesión: <b>'+esc(nx)+'</b></span><button class="btn sm" style="width:auto;padding:0 18px" data-gy="done">Hecho ✓</button></div><button class="link" data-gy="skip" style="margin-top:8px">Saltar</button>');
+  const rb=$("runCard");rb.hidden=!rest;
+  if(rest){const ran=g2.runs.includes(d);rb.innerHTML='<div class="mini-row"><div><h2>Hoy toca correr 🏃</h2><small class="sub">Día de descanso: sin gym</small></div><button class="btn sm'+(ran?" ok":"")+'" style="width:auto;padding:0 16px" data-run="1">Corrí ✓</button></div>';}}
+$("v-hoy").addEventListener("click",e=>{
+  const r=e.target.closest("[data-run]");if(r){const g2=S.gym2,d=today(),i=g2.runs.indexOf(d);if(i<0){g2.runs.push(d);toast("Corriste hoy 🏃");}else g2.runs.splice(i,1);persist();renderHoy();return;}
+  const b=e.target.closest("[data-gy]");if(!b)return;const g2=S.gym2,d=today(),k=b.dataset.gy;
+  if(k==="done"){const i=g2.idx;g2.sessions.push({d,t:ROT[i%4],i});g2.idx=i+1;L(d).done.entrene=true;persist();renderHoy();const st=dayStats(d);
+    if(st.k===st.n)celebrate("¡Día completo! 🎉");else toast(ROT[i%4]+" hecho 💪");}
+  else if(k==="undo"){let j=-1;g2.sessions.forEach((x,n)=>{if(x.d===d)j=n;});if(j<0)return;g2.sessions.splice(j,1);g2.idx=Math.max(0,g2.idx-1);
+    if(!g2.sessions.some(x=>x.d===d)&&S.log[d]&&S.log[d].done)S.log[d].done.entrene=false;persist();renderHoy();toast("Sesión deshecha");}
+  else if(k==="skip"){const old=ROT[g2.idx%4];g2.idx++;persist();renderHoy();toast("Saltaste "+old+". Sigue: "+ROT[g2.idx%4]);}});
 
 /* ---------- Cronómetro: guarda la hora de inicio, así sigue contando aunque cierres la app ---------- */
 let tmId=null,tmOpen=false,resetArmed=0,AC=null;
@@ -707,6 +834,7 @@ function renderHoy(){
   const tm=addD(d,1),nm=nowMin();$("planCard").hidden=nm<20*60+30;
   if(nm>=20*60+30){const ready=!!S.planned[tm],ol=occ(tm);$("planCard").classList.toggle("ready",ready);
     $("planCard").innerHTML='<span class="ic">'+(ready?"☀️":"🌅")+'</span><span><b>'+(ready?"Mañana listo ✓":"¿Ya armaste tu mañana?")+'</b><small>'+(ready?ol.length+(ol.length===1?" evento":" eventos")+" · "+fmtDur(freeMin(tm,ol))+" libres":"Te toma 2 minutos. Tus eventos que se repiten ya están puestos.")+'</small></span><span class="go">›</span>';}
+  renderDt();renderWork();renderGym();
   // datos viejos del entrenador
   const ta=S.trainerArchive;$("legacyCard").hidden=!(ta&&!ta.exported);
   // tu día
@@ -746,20 +874,27 @@ function renderCk(force){const box=$("ckBlock"),d=today();
   box.innerHTML='<div class="block-h"><h2>¿Cómo va tu día?</h2></div>'+
     '<h3>😴 Anoche</h3><div class="row2"><label class="field"><span>Me dormí</span><input class="input num" type="time" id="slBed" value="'+(sl.bed||"")+'"></label><label class="field"><span>Desperté</span><input class="input num" type="time" id="slWake" value="'+(sl.wake||"")+'"></label></div>'+
     '<p class="help num" id="slTxt">'+(sm?"Dormiste "+fmtDur(sm):"Pon a qué hora te dormiste y despertaste")+'</p>'+
+    '<p class="help num" id="slGoal">Meta: '+fmtT(S.settings.sleepBed||"23:15")+' → '+fmtT(S.settings.sleepWake||"06:15")+'</p><p class="warn" id="slWarn">'+esc(sleepMsg(sl))+'</p>'+
     '<h3>Tu ánimo</h3><div class="moods" role="radiogroup" aria-label="Ánimo">'+MOODS.map((m,i)=>'<button data-m="'+(i+1)+'" role="radio" aria-pressed="'+(md.v===i+1)+'" aria-label="'+m[1]+'">'+m[0]+'<small>'+m[1]+'</small></button>').join("")+'</div>'+
     '<input class="input" id="mdNote" maxlength="140" placeholder="Nota (opcional): ¿por qué?" autocomplete="off" value="'+esc(md.n||"")+'">'+
     '<h3>🙏 Hoy estoy agradecido por…</h3><div class="grat">'+[0,1,2].map(i=>'<input class="input" data-gi="'+i+'" maxlength="120" placeholder="'+(i+1)+'. '+["Ej. Mi familia","Ej. Que pude ir al gym","Ej. Una buena plática"][i]+'" autocomplete="off" value="'+esc(gr[i]||"")+'">').join("")+'</div>'+
     '<p class="help">Se guarda solo. Lo ves en Avance y en tu revisión del domingo.</p>';}
+function sleepMsg(sl){const wk=S.settings.sleepWake||"06:15";if(!sl||!sl.bed)return"";
+  if(sl.wake){const m=sleepMin(sl);return m&&m<420?"⚠️ Solo "+fmtDur(m)+" de sueño — menos de 7 h":"";}
+  const m=sleepMin({bed:sl.bed,wake:wk});return m&&m<420?"Si te levantas a las "+fmtT(wk)+" dormirías "+fmtDur(m)+" — menos de 7 h":"";}
+function paintSleep(){const sl={bed:$("slBed").value,wake:$("slWake").value},sm=sleepMin(sl);
+  $("slTxt").textContent=sm?"Dormiste "+fmtDur(sm):"Pon a qué hora te dormiste y despertaste";$("slWarn").textContent=sleepMsg(sl);}
 function saveCk(){const d=today(),g=L(d),was=!!g.done.gracias;
   const bed=$("slBed").value,wake=$("slWake").value;if(bed||wake)g.sleep={bed,wake};else delete g.sleep;
   const v=(g.mood&&g.mood.v)||0,n=$("mdNote").value.trim();if(v||n)g.mood={v,n};else delete g.mood;
   const gr=[...document.querySelectorAll("#ckBlock [data-gi]")].map(x=>x.value.trim());
   if(gr.some(Boolean))g.grat=gr;else delete g.grat;
   g.done.gracias=!!(g.grat&&g.grat.some(Boolean));
-  const sm=sleepMin(g.sleep);$("slTxt").textContent=sm?"Dormiste "+fmtDur(sm):"Pon a qué hora te dormiste y despertaste";
+  paintSleep();
   persist();renderHoy();renderAv();
   const st=dayStats(d);if(!was&&g.done.gracias&&st.k===st.n)celebrate("¡Día completo! 🎉");}
 $("ckBlock").addEventListener("input",saveCk);
+$("ckBlock").addEventListener("change",e=>{if(e.target.id==="slBed"||e.target.id==="slWake")paintSleep();});
 $("ckBlock").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;const g=L(today()),v=+b.dataset.m;
   g.mood={v:g.mood&&g.mood.v===v?0:v,n:(g.mood&&g.mood.n)||""};if(!g.mood.v&&!g.mood.n)delete g.mood;
   persist();renderCk(true);renderAv();if(g.mood&&g.mood.v)toast("Ánimo: "+MOODS[v-1][1]+" "+MOODS[v-1][0]);});
@@ -818,8 +953,9 @@ function renderSem(anim){
   $("frees").innerHTML='<div><b class="num">'+fmtDur(fm[si])+'</b><small>libres '+(selDate===t?"hoy":selDate===addD(t,1)?"mañana":"el "+DN[dow(selDate)])+'</small></div><div><b class="num">'+Math.round(wk/60)+' h</b><small>libres en la semana</small></div>';
   $("strip").hidden=wide;$("dayName").hidden=wide;
   $("strip").innerHTML=days.map((d,i)=>'<button class="dbtn'+(d===t?" today":"")+'" data-date="'+d+'" aria-pressed="'+(d===selDate)+'" aria-label="'+DN[dow(d)]+' '+pd(d).getDate()+'"><small>'+DL[dow(d)]+'</small><b class="num">'+pd(d).getDate()+'</b><i><u style="width:'+Math.round((1-fm[i]/tot)*100)+'%"></u></i></button>').join("");
+  $("dtSem").innerHTML=dtBlock(selDate,"Tipo de día");
   $("dayName").innerHTML=esc(dLabel(selDate))+'<small>'+(occ(selDate).length?"Toca un hueco para agregar":"Todo libre · toca un hueco para agregar")+'</small>';
-  const H=(DAY1-DAY0)*PX;let hrs="";for(let m=DAY0;m<=DAY1;m+=60)hrs+='<span style="top:'+((m-DAY0)*PX)+'px">'+(((m/60)%12)||12)+(m>=720?" pm":" am")+'</span>';
+  const H=(DAY1-DAY0)*PX;let hrs="";for(let m=DAY0;m<=DAY1;m+=60)hrs+='<span style="top:'+((m-DAY0)*PX)+'px">'+(((m/60)%12)||12)+(m>=720&&m<1440?" pm":" am")+'</span>';
   const heads=wide?'<div></div>'+days.map(d=>'<div class="colh'+(d===t?" today":"")+(d===selDate?" sel":"")+'">'+DL[dow(d)]+' '+pd(d).getDate()+'</div>').join(""):"";
   $("tlWrap").innerHTML='<div class="tl'+(wide?" wide":"")+'" id="tl">'+heads+'<div class="hours" style="height:'+H+'px">'+hrs+'</div>'+(wide?days.map(colHTML).join(""):colHTML(selDate))+'</div>';
   if(anim&&!wide&&!matchMedia("(prefers-reduced-motion: reduce)").matches){try{$("tl").animate([{opacity:0,transform:"translateX("+(anim*18)+"px)"},{opacity:1,transform:"none"}],{duration:200,easing:"cubic-bezier(.23,1,.32,1)"});}catch(e){}}
@@ -960,8 +1096,11 @@ function renderAv(){
 
 /* ---------- Ajustes ---------- */
 function renderAj(){
-  $("habitList").innerHTML=S.habits.map(h=>'<button class="row" data-h="'+h.id+'"><span>'+h.em+' '+esc(h.n)+'<small>'+(h.k==="timer"?h.min+" min con cronómetro":h.k==="grat"?"Fijo · se marca al escribir en Hoy":"Hábito de palomita")+'</small></span><span class="go">Editar ›</span></button>').join("")||'<p class="empty">Sin hábitos</p>';
+  $("habitList").innerHTML=S.habits.map(h=>'<button class="row" data-h="'+h.id+'"><span>'+h.em+' '+esc(h.n)+'<small>'+(h.k==="timer"?h.min+" min con cronómetro":h.k==="grat"?"Fijo · se marca al escribir en Hoy":h.fixed?"Fijo · puedes cambiarle el nombre":"Hábito de palomita")+'</small></span><span class="go">Editar ›</span></button>').join("")||'<p class="empty">Sin hábitos</p>';
   $("closeAt").value=S.settings.close;
+  const rd=restDay();$("restDays").innerHTML=[1,2,3,4,5,6,0].map(i=>'<button data-rd="'+i+'" aria-pressed="'+(rd===i)+'" aria-label="'+DN[i]+'">'+DN[i][0].toUpperCase()+DN[i].slice(1,3)+'</button>').join("");
+  const sv=(id,v)=>{if(document.activeElement!==$(id))$(id).value=v;};sv("shiftH",+S.settings.shiftH||8);sv("bankAdj",Math.round(+S.settings.bankAdj)||0);sv("sleepBed",S.settings.sleepBed||"23:15");sv("sleepWake",S.settings.sleepWake||"06:15");
+  $("bankTxt").textContent="Banco de horas: "+fmtBank(bankMin());
   $("bkLast").textContent=S.lastBackup?"Último: "+new Date(S.lastBackup).toLocaleDateString("es-MX",{day:"numeric",month:"long"}):"Nunca has hecho uno";
   $("legacyRow").hidden=!S.trainerArchive;$("coachRow").href=ENTRENADOR;
   $("staffAj").innerHTML=S.staff.slice().sort((a,b)=>a.t.localeCompare(b.t)).map(x=>'<button class="row" data-sf="'+x.id+'"><span>'+x.em+' '+esc(x.n)+'<small class="num">'+esc(daysTxt(x.days))+' · '+fmtT(x.t)+'</small></span><span class="go">Editar ›</span></button>').join("");
@@ -986,7 +1125,7 @@ const icsEsc=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g
 // líneas de máximo 75 bytes (regla del formato)
 function fold(line){const out=[];let cur="",bytes=0;for(const ch of line){const b=new TextEncoder().encode(ch).length;if(bytes+b>(out.length?74:75)){out.push(cur);cur="";bytes=0;}cur+=ch;bytes+=b;}out.push(cur);return out.join("\r\n ");}
 function firstOn(days,from){for(let i=0;i<7;i++){const d=addD(from,i);if(days.includes(dow(d)))return d;}return from;}
-const icsDT=(date,min)=>date.replace(/-/g,"")+"T"+pad(Math.floor(min/60))+pad(min%60)+"00";
+const icsDT=(date,min)=>{min=Math.min(min,1439);return date.replace(/-/g,"")+"T"+pad(Math.floor(min/60))+pad(min%60)+"00";};
 function buildICS(){const L2=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Mi dia//ES","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:Mi día"];
   const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,""),t=today();let n=0;
   const add=(id,title,desc,url,date,s,e,days,ex)=>{n++;L2.push("BEGIN:VEVENT","UID:"+id+"@mi-dia.goryelmaster","DTSTAMP:"+stamp,"DTSTART:"+icsDT(date,s),"DTEND:"+icsDT(date,e),"RRULE:FREQ=WEEKLY;BYDAY="+days.map(i=>BYDAY[i]).join(","),"SUMMARY:"+icsEsc(title));
@@ -994,7 +1133,7 @@ function buildICS(){const L2=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Mi dia/
     (ex||[]).forEach(x=>L2.push("EXDATE:"+icsDT(x,s)));
     L2.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(title),"TRIGGER:-PT5M","END:VALARM","END:VEVENT");};
   S.staff.forEach(x=>{if(!x.days.length)return;const s=t2m(x.t);add("staff-"+x.id,x.em+" "+x.n,x.what+"\n\nPídele: "+x.p+"\n\nAbre Claude: https://claude.ai/new",claudeURL(x.p),firstOn(x.days,t),s,Math.min(s+15,1439),x.days);});
-  S.events.filter(ev=>ev.rep&&ev.rep.length).forEach(ev=>{const from=ev.from>t?ev.from:t,d0=firstOn(ev.rep,from);add("ev-"+ev.id,ev.n,"De tu semana en Mi día",null,d0,ev.s,ev.e,ev.rep,Object.keys(ev.ex||{}).filter(x=>x>=d0).sort());});
+  S.events.filter(ev=>ev.rep&&ev.rep.length&&!(ev.until&&ev.until<t)).forEach(ev=>{const from=ev.from>t?ev.from:t,d0=firstOn(ev.rep,from);add("ev-"+ev.id,ev.n,"De tu semana en Mi día",null,d0,ev.s,ev.e,ev.rep,Object.keys(ev.ex||{}).filter(x=>x>=d0).sort());});
   L2.push("END:VCALENDAR");return{text:L2.map(fold).join("\r\n")+"\r\n",n};}
 $("icsBtn").onclick=()=>{const r=buildICS();S.settings.icsAt=Date.now();persist();download("mi-dia-horario.ics",r.text,"text/calendar");renderAj();
   toast(r.n+" eventos. Guárdalo en Archivos y ábrelo para agregarlo");};
@@ -1010,7 +1149,7 @@ function weekData(ws){const dias=[],hc={},timers=S.habits.filter(h=>h.k==="timer
       animo:g.mood&&g.mood.v||0,nota:g.mood&&g.mood.n||"",gracias:(g.grat||[]).filter(Boolean),durmio:g.sleep&&g.sleep.bed||"",desperto:g.sleep&&g.sleep.wake||"",suenoMin:sm||0,
       eventos:occ(d).map(o=>({n:o.n,hora:fmtR(o.s,o.e),estado:o.st||""}))});}
   const practicaPorHabito=timers.map(h=>({habito:h.n,min:Math.round(dias.reduce((a,x,i)=>a+Math.min(((S.log[addD(ws,i)]||{}).sec||{})[h.id]||0,h.min*60)/60,0))}));
-  return{semana:ws+" a "+addD(ws,6),desde:ws,hasta:addD(ws,6),habitos:Object.values(hc),practicaMin:Math.round(practica),practicaPorHabito,gymDias:gym,
+  return{semana:ws+" a "+addD(ws,6),desde:ws,hasta:addD(ws,6),habitos:Object.values(hc),practicaMin:Math.round(practica),practicaPorHabito,gymDias:gym,sesionesGym:S.gym2.sessions.filter(x=>x.d>=ws&&x.d<=addD(ws,6)).length,carreras:S.gym2.runs.filter(x=>x>=ws&&x<=addD(ws,6)).length,
     suenoProm:sueno.length?Math.round(sueno.reduce((a,b)=>a+b,0)/sueno.length):0,nochesAnotadas:sueno.length,dias};}
 // Huecos de 30 min o más entre tus eventos (6 am a 11 pm)
 function freeSlots(ws){const out=[];for(let i=0;i<7;i++){const d=addD(ws,i);freeGaps(d).forEach(g=>{if(g.e-g.s>=30)out.push({fecha:d,dia:DN[dow(d)],s:g.s,e:g.e,hora:fmtR(g.s,g.e),min:g.e-g.s});});}return out;}
@@ -1077,6 +1216,12 @@ $("rvBody").addEventListener("change",e=>{const c=e.target.closest("[data-pi]");
 $("rvBtn").onclick=openReview;
 $("habitList").addEventListener("click",e=>{const b=e.target.closest("[data-h]");if(b)openHabit(b.dataset.h);});
 $("addHabit2").onclick=()=>openHabit(null,"check");
+$("restDays").addEventListener("click",e=>{const b=e.target.closest("[data-rd]");if(!b)return;const w=+b.dataset.rd;S.settings.restDay=restDay()===w?null:w;persist();renderAll();
+  toast(S.settings.restDay==null?"Sin día de descanso fijo":"Descansas los "+DN[w]);});
+$("shiftH").addEventListener("change",e=>{const v=+e.target.value;S.settings.shiftH=v>=1&&v<=16?v:8;persist();renderAll();});
+$("bankAdj").addEventListener("change",e=>{S.settings.bankAdj=Math.round(+e.target.value)||0;persist();renderAll();});
+$("sleepBed").addEventListener("change",e=>{if(e.target.value){S.settings.sleepBed=e.target.value;persist();renderAll();}});
+$("sleepWake").addEventListener("change",e=>{if(e.target.value){S.settings.sleepWake=e.target.value;persist();renderAll();}});
 $("closeAt").addEventListener("change",e=>{if(e.target.value){S.settings.close=e.target.value;persist();renderHoy();toast("Hora de cerrar: "+fmtT(e.target.value));}});
 const THEMES=[["menta","Menta","#E7F0EA","#17352C"],["noche","Noche","#101C18","#E4EFE8"],["lila","Lila","#EEE9F5","#2E2342"],["cielo","Cielo","#E6EEF6","#1B2E45"]];
 function applyTheme(t){if(!THEMES.some(x=>x[0]===t))t="menta";if(t==="menta")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",t);
@@ -1096,7 +1241,7 @@ $("bkLoad").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)
 $("wipe").onclick=()=>{if(!confirmTwice($("wipe"),"Toca otra vez para borrar todo"))return;S=blank();persist();renderAll();toast("Se borró todo");};
 
 /* ---------- Hoja: hábito ---------- */
-const EMOJIS=["✅","🛏️","💧","📖","🎷","🎹","💻","🌙","💪","🧘","🇺🇸","📚","🥗","🙏","🎤","✍️"];
+const EMOJIS=["✅","🛏️","💧","📖","🎷","🎹","💻","🌙","💪","🧘","🇺🇸","📚","🥗","🙏","🎤","✍️","🚿","🪥","👕"];
 const MINS=[10,15,20,30,45,60,90];
 let F={k:"check",em:"✅",min:30,id:null};
 $("fEmoji").innerHTML=EMOJIS.map(x=>'<button data-e="'+x+'">'+x+'</button>').join("");
@@ -1107,18 +1252,18 @@ function paintHabit(){document.querySelectorAll("#seg button").forEach(b=>b.setA
   $("fMinWrap").hidden=F.k!=="timer";$("seg").hidden=!!F.id;
   $("nameLbl").textContent=F.k==="timer"?"¿Qué vas a practicar?":"¿Qué hábito?";
   $("fName").placeholder=F.k==="timer"?"Ej. Piano":"Ej. Tender la cama";
-  $("fSave").textContent=F.id?"Guardar cambios":"Agregar hábito";$("fDel").hidden=!F.id||F.k==="grat";}
+  $("fSave").textContent=F.id?"Guardar cambios":"Agregar hábito";$("fDel").hidden=!F.id||F.k==="grat"||!!F.fixed;}
 $("seg").addEventListener("click",e=>{const b=e.target.closest("button");if(b){F.k=b.dataset.k;paintHabit();}});
 $("fEmoji").addEventListener("click",e=>{const b=e.target.closest("button");if(b){F.em=b.dataset.e;paintHabit();}});
 $("fMins").addEventListener("click",e=>{const b=e.target.closest("button");if(b){F.min=+b.dataset.m;paintHabit();}});
 function openHabit(id,k){const h=id&&hab(id);
-  F=h?{k:h.k,em:h.em,min:h.min||30,id:h.id}:{k:k||"check",em:k==="timer"?"⏱️":"✅",min:30,id:null};if(!EMOJIS.includes(F.em))F.em="✅";
+  F=h?{k:h.k,em:h.em,min:h.min||30,id:h.id,fixed:!!h.fixed}:{k:k||"check",em:k==="timer"?"⏱️":"✅",min:30,id:null};if(!EMOJIS.includes(F.em))F.em="✅";
   $("fName").value=h?h.n:"";paintHabit();showSheet("hSheet");}
 $("fSave").onclick=()=>{const n=$("fName").value.trim();if(!n){toast("Escribe un nombre");return;}
   if(F.id){const h=hab(F.id);Object.assign(h,{n,em:F.em,min:F.k==="timer"?F.min:undefined});}
   else S.habits.push({id:uid(),n,em:F.em,k:F.k,min:F.k==="timer"?F.min:undefined,since:today()});
   saved(F.id?"Hábito actualizado":"Hábito agregado");};
-$("fDel").onclick=()=>{if(!confirmTwice($("fDel"),"Toca otra vez para borrar el hábito"))return;S.habits=S.habits.filter(x=>x.id!==F.id);saved("Hábito borrado");};
+$("fDel").onclick=()=>{const hh=hab(F.id);if(hh&&hh.fixed)return;if(!confirmTwice($("fDel"),"Toca otra vez para borrar el hábito"))return;S.habits=S.habits.filter(x=>x.id!==F.id);saved("Hábito borrado");};
 
 /* ---------- Navegación, aviso y confeti (peak-end) ---------- */
 const VIEWS={hoy:renderHoy,sem:renderSem,av:renderAv,aj:renderAj};
@@ -1137,7 +1282,7 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden){tick();re
 setInterval(()=>{if(curView==="hoy")renderHoy();else if(curView==="sem"&&!openSheetId)renderSem();},60000);
 const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
 if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))$("installTip").hidden=false;
-const APP_VER=9;
+const APP_VER=10;
 try{$("appVer").textContent="Versión "+APP_VER+" · "+location.host+location.pathname;}catch(e){}
 try{if("serviceWorker" in navigator&&window.isSecureContext){const had=!!navigator.serviceWorker.controller;let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!had||reloaded)return;reloaded=true;location.reload();});navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>{document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){try{reg.update().catch(()=>{});}catch(e){}}});}).catch(()=>{});}}catch(e){}
 
@@ -1170,7 +1315,7 @@ function resumen(){const t=today(),ws=wkStart(t),g=S.log[t]||{};const en=S.engli
   const lh=habsOn(t).map(h=>({id:h.id,nombre:h.n,tipo:h.k,hecho:!!(g.done&&g.done[h.id])}));
   return{fecha:t,registroHoy:dayRow(t),hoy:agenda(t),manana:agenda(addD(t,1)),semana,semanaInicio:ws,habitos:{fecha:t,lista:lh,hechos:lh.filter(x=>x.hecho).length,total:lh.length},eventosHoy:occ(t).map(o=>({n:o.n,hora:fmtR(o.s,o.e),estado:o.st||""})),
     empleadosHoy:staffToday(t).map(x=>({empleado:x.n,hora:fmtT(x.t),que:x.what})),
-    empleados:staffPlan(),ultimoTemaIngles:en||null,entrenoHoy:!!(g.done&&g.done.entrene),
+    empleados:staffPlan(),ultimoTemaIngles:en||null,entrenoHoy:!!(g.done&&g.done.entrene),siguienteSesion:ROT[S.gym2.idx%4],tipoDia:{hoy:S.dayType[t]||"",manana:S.dayType[addD(t,1)]||""},bancoHorasMin:bankMin(),
     semanaStats:weekData(ws),libresProximaSemana:freeSlots(addD(ws,7)).map(({fecha,dia,hora,min})=>({fecha,dia,hora,min})),
     ultimaRevision:(S.reviews[Object.keys(S.reviews).sort().pop()]||{}).texto||null};}
 async function api(body){
@@ -1186,7 +1331,10 @@ async function syncNow(manual){
   if(!manual&&!rows.length&&stS===sync.stSig&&uploadedToday()){paintSync();return;}
   syncing=true;paintSync();
   try{
-    const j=await api({accion:"guardar",tablas:{dias:rows,empleados:S.staff.map(x=>({id:x.id,empleado:x.n,que_hace:x.what,dias:daysTxt(x.days),hora:x.t,pide:x.p}))},reemplazar:["empleados"],estado:S,resumen:resumen(),vacio:isEmpty()});
+    const td=today(),isOff=e=>e&&e.until&&e.until<td&&e.rep&&e.rep.length;
+    const evs=Array.isArray(S.events)?S.events:[];
+    const payload=evs.some(isOff)?{...S,events:evs.filter(e=>!isOff(e)),eventsOff:evs.filter(isOff)}:S;
+    const j=await api({accion:"guardar",tablas:{dias:rows,empleados:S.staff.map(x=>({id:x.id,empleado:x.n,que_hace:x.what,dias:daysTxt(x.days),hora:x.t,pide:x.p}))},reemplazar:["empleados"],estado:payload,resumen:resumen(),vacio:isEmpty()});
     if(typeof j.calendario==="string")sync.cal=j.calendario;
     rows.forEach(r=>{sync.sig[r.id]=hash(JSON.stringify(r));});sync.stSig=stS;sync.last=Date.now();sync.err="";if(manual)toast("Listo, subido a la nube");
   }catch(e){sync.err=String(e&&e.message||e);if(manual)toast("No se pudo subir: "+sync.err);}
